@@ -1,5 +1,6 @@
 import copy
 from itertools import product as prod
+from typing import Any
 
 class CSP:
     def __init__(self):
@@ -12,6 +13,12 @@ class CSP:
         # self.constraints[i][j] is a list of legal value pairs for
         # the variable pair (i, j)
         self.constraints = {}
+
+        # backtrack counter
+        self.backtrack_counter = 0
+
+        # backtrack failure counter
+        self.backtrack_failure_counter = 0
 
     def add_variable(self, name: str, domain: list):
         """Add a new variable to the CSP.
@@ -131,6 +138,8 @@ class CSP:
         assignments and inferences that took place in previous
         iterations of the loop.
         """
+        # Increment backtrack counter
+        self.backtrack_counter += 1
 
         # Check if assignment is complete
         if all(len(assignment[var]) == 1 for var in self.variables):
@@ -148,7 +157,9 @@ class CSP:
                 result = self.backtrack(new_assignment)
                 if result is not None:
                     return result
-
+                
+        # Increment backtrack failure counter
+        self.backtrack_failure_counter += 1
         return None
 
     def select_unassigned_variable(self, assignment):
@@ -200,6 +211,12 @@ class CSP:
                 assignment[i].remove(x)
                 revised = True
         return revised
+    
+    def get_backtrack_counter(self):
+        return self.backtrack_counter
+    
+    def get_backtrack_failure_counter(self):
+        return self.backtrack_failure_counter
     
 def create_map_coloring_csp():
     """Instantiate a CSP representing the map coloring problem from the
@@ -279,5 +296,7 @@ solution = sudoku_csp.backtracking_search()
 
 if solution is not None:
     print_sudoku_solution(solution)
+    print("Run: ", CSP.get_backtrack_counter(sudoku_csp))
+    print("Failures: ", CSP.get_backtrack_failure_counter(sudoku_csp))
 else:
     print("No solution found.")
