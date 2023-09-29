@@ -1,10 +1,5 @@
-# CSP Assignment
-# Original code by Håkon Måløy
-# Updated by Xavier Sánchez Díaz
-
 import copy
 from itertools import product as prod
-
 
 class CSP:
     def __init__(self):
@@ -78,44 +73,12 @@ class CSP:
         """
         return [(i, var) for i in self.constraints[var]]
 
-    def add_constraint_one_way(self, i: str, j: str,
-                               filter_function: callable):
-        """Add a new constraint between variables 'i' and 'j'. Legal
-        values are specified by supplying a function 'filter_function',
-        that should return True for legal value pairs, and False for
-        illegal value pairs.
-
-        NB! This method only adds the constraint one way, from i -> j.
-        You must ensure to call the function the other way around, in
-        order to add the constraint the from j -> i, as all constraints
-        are supposed to be two-way connections!
-
-        Parameters
-        ----------
-        i : str
-            Name of the first variable
-        j : str
-            Name of the second variable
-        filter_function : callable
-            A callable (function name) that needs to return a boolean.
-            This will filter value pairs which pass the condition and
-            keep away those that don't pass your filter.
-        """
+    def add_constraint_one_way(self, i: str, j: str, constraint_function: callable):
         if j not in self.constraints[i]:
-            # First, get a list of all possible pairs of values
-            # between variables i and j
-            self.constraints[i][j] = self.get_all_possible_pairs(
-                self.domains[i], self.domains[j])
-
-        # Next, filter this list of value pairs through the function
-        # 'filter_function', so that only the legal value pairs remain
-        self.constraints[i][j] = list(filter(lambda
-                                             value_pair:
-                                             filter_function(*value_pair),
-                                             self.constraints[i][j]))
+            self.constraints[i][j] = constraint_function
 
     def add_all_different_constraint(self, var_list: list):
-        """Add an Alldiff constraint between all of the variables in the
+         """Add an Alldiff constraint between all of the variables in the
         list provided.
 
         Parameters
@@ -123,7 +86,7 @@ class CSP:
         var_list : list
             A list of variable names
         """
-        for (i, j) in self.get_all_possible_pairs(var_list, var_list):
+         for (i, j) in self.get_all_possible_pairs(var_list, var_list):
             if i != j:
                 self.add_constraint_one_way(i, j, lambda x, y: x != y)
 
@@ -168,8 +131,25 @@ class CSP:
         assignments and inferences that took place in previous
         iterations of the loop.
         """
-        # TODO: YOUR CODE HERE
-        pass
+
+        # Check if assignment is complete
+        if all(len(assignment[var]) == 1 for var in self.variables):
+            return assignment
+
+        # Select unassigned variable
+        var = self.select_unassigned_variable(assignment)
+
+        # Try all values for the variable
+        for value in assignment[var]:
+            new_assignment = copy.deepcopy(assignment)
+            new_assignment[var] = [value]
+            # Check if the assignment is consistent
+            if self.inference(new_assignment, self.get_all_neighboring_arcs(var)):
+                result = self.backtrack(new_assignment)
+                if result is not None:
+                    return result
+
+        return None
 
     def select_unassigned_variable(self, assignment):
         """The function 'Select-Unassigned-Variable' from the pseudocode
@@ -177,8 +157,10 @@ class CSP:
         in 'assignment' that have not yet been decided, i.e. whose list
         of legal values has a length greater than one.
         """
-        # TODO: YOUR CODE HERE
-        pass
+
+        # Select variable with fewest legal values
+        unassigned_vars = [var for var in self.variables if len(assignment[var]) > 1]
+        return min(unassigned_vars, key=lambda var: len(assignment[var]))
 
     def inference(self, assignment, queue):
         """The function 'AC-3' from the pseudocode in the textbook.
@@ -186,8 +168,21 @@ class CSP:
         the lists of legal values for each undecided variable. 'queue'
         is the initial queue of arcs that should be visited.
         """
-        # TODO: YOUR CODE HERE
-        pass
+
+        # Check if there is a value in i's domain that satisfies the constraint
+        while queue:
+            i, j = queue.pop(0)
+            if self.revise(assignment, i, j):
+                # Check if domain is empty
+                if not assignment[i]:
+                    return False
+
+                # Add all neighbors except j to queue
+                for k in self.get_all_neighboring_arcs(i):
+                    if k[0] != j:
+                        queue.append(k)
+
+        return True
 
     def revise(self, assignment, i, j):
         """The function 'Revise' from the pseudocode in the textbook.
@@ -198,10 +193,14 @@ class CSP:
         between i and j, the value should be deleted from i's list of
         legal values in 'assignment'.
         """
-        # TODO: YOUR CODE HERE
-        pass
-
-
+        # Check if there is a value in i's domain that satisfies the constraint
+        revised = False
+        for x in assignment[i]:
+            if all(not self.constraints[i][j](x, y) for y in assignment[j]):
+                assignment[i].remove(x)
+                revised = True
+        return revised
+    
 def create_map_coloring_csp():
     """Instantiate a CSP representing the map coloring problem from the
     textbook. This can be useful for testing your CSP solver as you
@@ -220,7 +219,6 @@ def create_map_coloring_csp():
             csp.add_constraint_one_way(other_state, state, lambda i, j: i != j)
     return csp
 
-
 def create_sudoku_csp(filename: str) -> CSP:
     """Instantiate a CSP representing the Sudoku board found in the text
     file named 'filename' in the current directory.
@@ -235,23 +233,21 @@ def create_sudoku_csp(filename: str) -> CSP:
     CSP
         A CSP instance
     """
+
     csp = CSP()
-    board = list(map(lambda x: x.strip(), open(filename, 'r')))
+    board = list(map(lambda x: x.strip(), open(filename, 'rt')))
 
     for row in range(9):
         for col in range(9):
             if board[row][col] == '0':
-                csp.add_variable('%d-%d' % (row, col), list(map(str,
-                                                                range(1, 10))))
+                csp.add_variable('%d-%d' % (row, col), list(map(str, range(1, 10))))
             else:
                 csp.add_variable('%d-%d' % (row, col), [board[row][col]])
 
     for row in range(9):
-        csp.add_all_different_constraint(['%d-%d' % (row, col)
-                                          for col in range(9)])
+        csp.add_all_different_constraint(['%d-%d' % (row, col) for col in range(9)])
     for col in range(9):
-        csp.add_all_different_constraint(['%d-%d' % (row, col)
-                                         for row in range(9)])
+        csp.add_all_different_constraint(['%d-%d' % (row, col) for row in range(9)])
     for box_row in range(3):
         for box_col in range(3):
             cells = []
@@ -262,22 +258,26 @@ def create_sudoku_csp(filename: str) -> CSP:
 
     return csp
 
-
 def print_sudoku_solution(solution):
     """Convert the representation of a Sudoku solution as returned from
     the method CSP.backtracking_search(), into a human readable
     representation.
     """
+
     for row in range(9):
         for col in range(9):
-            print(solution['%d-%d' % (row, col)][0], end=" "),
+            print(solution['%d-%d' % (row, col)][0], end=" ")
             if col == 2 or col == 5:
-                print('|', end=" "),
+                print('|', end=" ")
         print("")
         if row == 2 or row == 5:
             print('------+-------+------')
 
+filename = input("Enter filename: ")  
+sudoku_csp = create_sudoku_csp(filename)
+solution = sudoku_csp.backtracking_search()
 
-
-
-
+if solution is not None:
+    print_sudoku_solution(solution)
+else:
+    print("No solution found.")
