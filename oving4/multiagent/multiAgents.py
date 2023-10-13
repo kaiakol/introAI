@@ -105,6 +105,7 @@ class MultiAgentSearchAgent(Agent):
         self.index = 0 # Pacman is always agent index 0
         self.evaluationFunction = util.lookup(evalFn, globals())
         self.depth = int(depth)
+        
 
 class MinimaxAgent(MultiAgentSearchAgent):
     """
@@ -135,7 +136,46 @@ class MinimaxAgent(MultiAgentSearchAgent):
         Returns whether or not the game state is a losing state
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        result = self.get_value(gameState, 0, 0)
+        return result[1]
+    
+    def get_value(self, gameState, agentIndex, depth):
+        if len(gameState.getLegalActions(agentIndex)) == 0 or depth == self.depth:
+            return (self.evaluationFunction(gameState), "")
+        
+        return self.best_value(gameState, agentIndex, depth)
+        
+    def best_value(self, gameState, agentIndex, depth):
+        legalActions = gameState.getLegalActions(agentIndex)
+        value = 0
+        action = "" 
+        
+        if agentIndex == 0:
+            value = float("-inf")
+        else:    
+            value = float("inf")
+        
+        for move in legalActions:
+            successor = gameState.generateSuccessor(agentIndex, move)
+            successor_index = agentIndex + 1
+            successor_depth = depth
+            
+            if successor_index == gameState.getNumAgents():
+                successor_index = 0
+                successor_depth += 1
+        
+            current_value = self.get_value(successor, successor_index, successor_depth)[0]
+            
+            if current_value > value and agentIndex == 0:
+                value = current_value
+                action = move
+                
+            elif current_value < value and agentIndex != 0:
+                value = current_value
+                action = move
+            
+        return value, action
+        
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -147,7 +187,52 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        result = self.getBestResult(gameState, 0, 0, float("-inf"), float("inf"))
+        return result[0]
+    
+    def getBestResult(self, gameState, index, depth, alpha, beta):
+        if len(gameState.getLegalActions(index)) == 0 or depth == self.depth:
+            return "", gameState.getScore()
+        
+        return self.bestValue(gameState, index, depth, alpha, beta)
+    
+    def bestValue(self, gameState, agentIndex, depth, alpha, beta):
+        legalActions = gameState.getLegalActions(agentIndex)
+        value = 0
+        action = "" 
+        
+        if agentIndex == 0:
+            value = float("-inf")
+        else:    
+            value = float("inf")
+        
+        for move in legalActions:
+            successor = gameState.generateSuccessor(agentIndex, move)
+            successor_index = agentIndex + 1
+            successor_depth = depth
+            
+            if successor_index == gameState.getNumAgents():
+                successor_index = 0
+                successor_depth += 1
+        
+            current_action, current_value = self.getBestResult(successor, successor_index, successor_depth, alpha, beta)
+            
+            if current_value > value and agentIndex == 0:
+                value = current_value
+                action = move
+                alpha = max(alpha, value)
+                if value > beta:
+                    return action, value
+                
+            elif current_value < value and agentIndex != 0:
+                value = current_value
+                action = move
+                beta = min(beta, value)
+                if value < alpha:
+                    return action, value
+        return action, value
+            
+            
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
